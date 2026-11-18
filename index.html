@@ -1,0 +1,265 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>chemomer — a native InChI engine in Rust</title>
+<meta name="description" content="molfile in, InChI / AuxInfo / InChIKey out — byte-exact with the IUPAC InChI reference, gated by a shared conformance corpus.">
+<link rel="icon" href='data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><polygon points="12,2 21,7 21,17 12,22 3,17 3,7" fill="none" stroke="%230c6b5c" stroke-width="2"/></svg>'>
+<style>
+  :root {
+    --paper: #fbfcfa;
+    --ink: #1a2420;
+    --muted: #5b6a63;
+    --accent: #0c6b5c;
+    --accent-ink: #084c41;
+    --line: #dde5e0;
+    --mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  }
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body {
+    margin: 0;
+    background: var(--paper);
+    color: var(--ink);
+    font: 16px/1.6 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  a { color: var(--accent-ink); text-decoration-thickness: 1px; text-underline-offset: 3px; }
+  a:hover { color: var(--accent); }
+
+  header {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 1rem;
+    padding: 1.4rem clamp(1.2rem, 6vw, 4rem);
+    border-bottom: 1px solid var(--line);
+  }
+  .wordmark {
+    font-family: Georgia, "Times New Roman", serif;
+    font-size: 1.25rem;
+    letter-spacing: 0.02em;
+    color: var(--ink);
+    text-decoration: none;
+  }
+  .wordmark b { color: var(--accent); font-weight: normal; }
+  header nav a { font-size: 0.9rem; margin-left: 1.4rem; }
+
+  main { max-width: 62rem; margin: 0 auto; padding: 0 clamp(1.2rem, 6vw, 4rem); }
+
+  .hero { padding: 3.5rem 0 2.5rem; }
+  .eyebrow {
+    font-family: var(--mono);
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 0.18em;
+    color: var(--accent);
+    margin: 0 0 1rem;
+  }
+  h1 {
+    font-family: Georgia, "Times New Roman", serif;
+    font-weight: normal;
+    font-size: clamp(2rem, 5vw, 3.1rem);
+    line-height: 1.15;
+    margin: 0 0 1rem;
+    max-width: 34ch;
+  }
+  .hero p { max-width: 56ch; color: var(--muted); margin: 0; font-size: 1.05rem; }
+
+  /* Signature: the oracle identifier, blocked like an InChIKey */
+  .keyflow {
+    margin: 2.6rem 0 0;
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    background: #fff;
+    overflow: hidden;
+  }
+  .keyflow .row {
+    display: flex;
+    align-items: baseline;
+    gap: 1.2rem;
+    padding: 0.8rem 1.1rem;
+    border-bottom: 1px solid var(--line);
+    flex-wrap: wrap;
+  }
+  .keyflow .row:last-child { border-bottom: 0; }
+  .keyflow .label {
+    font-family: var(--mono);
+    font-size: 0.72rem;
+    text-transform: uppercase;
+    letter-spacing: 0.14em;
+    color: var(--muted);
+    min-width: 8.5rem;
+  }
+  .keyflow code { font-family: var(--mono); font-size: 0.86rem; word-break: break-all; }
+  .key {
+    font-family: var(--mono);
+    font-size: clamp(0.95rem, 2.4vw, 1.25rem);
+    letter-spacing: 0.04em;
+  }
+  .key .skeleton { color: var(--ink); }
+  .key .proton {
+    background: color-mix(in srgb, var(--accent) 14%, transparent);
+    border-radius: 3px;
+    padding: 0 0.15em;
+    color: var(--accent-ink);
+  }
+  .key .charge { color: var(--muted); }
+  .keyflow .row.origin { color: var(--muted); }
+  .keyflow .row.origin .src {
+    font-family: var(--mono);
+    font-size: 0.72rem;
+    border: 1px solid var(--line);
+    border-radius: 3px;
+    padding: 0.1rem 0.4rem;
+  }
+
+  section { padding: 2.2rem 0; border-top: 1px solid var(--line); }
+  section > h2 {
+    font-family: Georgia, serif;
+    font-weight: normal;
+    font-size: 1.4rem;
+    margin: 0 0 0.4rem;
+  }
+  section > p.lede { color: var(--muted); max-width: 58ch; margin: 0 0 1.8rem; }
+
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(16rem, 1fr));
+    gap: 1rem;
+  }
+  .card {
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    background: #fff;
+    padding: 1.1rem 1.2rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+  .card h3 { margin: 0; font-size: 1rem; font-family: var(--mono); font-weight: 600; }
+  .card h3 a { text-decoration: none; color: var(--ink); }
+  .card h3 a:hover { color: var(--accent); }
+  .card p { margin: 0; font-size: 0.88rem; color: var(--muted); flex: 1; }
+  .card .meta { display: flex; align-items: center; gap: 0.6rem; flex-wrap: wrap; }
+  .card .lang {
+    font-family: var(--mono);
+    font-size: 0.7rem;
+    color: var(--accent-ink);
+    border: 1px solid var(--line);
+    border-radius: 3px;
+    padding: 0.12rem 0.45rem;
+    background: var(--paper);
+  }
+  .card img { height: 18px; }
+
+  footer {
+    border-top: 1px solid var(--line);
+    padding: 1.6rem clamp(1.2rem, 6vw, 4rem) 2.4rem;
+    color: var(--muted);
+    font-size: 0.85rem;
+    display: flex;
+    justify-content: space-between;
+    gap: 1rem;
+    flex-wrap: wrap;
+  }
+  footer code { font-family: var(--mono); font-size: 0.8rem; }
+
+  @media (prefers-reduced-motion: no-preference) {
+    .key .proton { transition: background 0.2s; }
+  }
+  :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+</style>
+</head>
+<body>
+
+<header>
+  <a class="wordmark" href="/">chemo<b>mer</b></a>
+  <nav>
+    <a href="#packages">Packages</a>
+    <a href="https://github.com/chemomer">GitHub</a>
+  </nav>
+</header>
+
+<main>
+
+  <div class="hero">
+    <p class="eyebrow">Rust · InChI · byte-exact</p>
+    <h1>A native InChI engine, gated by the oracle it was built against.</h1>
+    <p>chemomer reads molfiles and derives InChI, AuxInfo, and InChIKey —
+    byte-exact with the IUPAC InChI 1.07.5 reference implementation. Every
+    release passes the same conformance corpus the oracle recorded; a
+    difference is a failing gate, not a footnote.</p>
+
+    <figure class="keyflow" aria-label="Example derivation from the conformance corpus">
+      <div class="row origin">
+        <span class="label">input</span>
+        <span class="src">molfile</span>
+        <code>C&nbsp;9&nbsp;H&nbsp;17&nbsp;N&nbsp;1&nbsp;O&nbsp;4&nbsp;… V2000</code>
+      </div>
+      <div class="row">
+        <span class="label">InChI</span>
+        <code>InChI=1S/C9H17NO4/c1-7(11)14-8(5-9(12)13)6-10(2,3)4/h8H,5-6H2,1-4H3</code>
+      </div>
+      <div class="row">
+        <span class="label">InChIKey</span>
+        <span class="key">
+          <span class="skeleton">RDHQFKQIGNGIED</span>-
+          <span class="proton">UHFFFAOYSA</span>-
+          <span class="charge">N</span>
+        </span>
+      </div>
+      <div class="row origin">
+        <span class="label">corpus row</span>
+        <code>identity/breadth-1 — acetylcholine, oracle-recorded</code>
+      </div>
+    </figure>
+  </div>
+
+  <section id="packages">
+    <h2>Packages</h2>
+    <p class="lede">One engine, four doors. The bindings are thin wrappers over the
+    same Rust core; versions ride the engine they wrap.</p>
+    <div class="grid">
+      <div class="card">
+        <h3><a href="https://github.com/chemomer/chemomer">chemomer</a></h3>
+        <p>The engine. Native Rust, no runtime deps, C ABI in-tree.</p>
+        <div class="meta"><span class="lang">Rust</span>
+          <a href="https://crates.io/crates/chemomer"><img src="https://img.shields.io/crates/v/chemomer.svg" alt="crates.io"></a></div>
+      </div>
+      <div class="card">
+        <h3><a href="https://github.com/chemomer/inchi-tests">inchi-tests</a></h3>
+        <p>The conformance corpus: oracle-recorded identifiers, fixture schema, recording harness, gate contract.</p>
+        <div class="meta"><span class="lang">corpus</span></div>
+      </div>
+      <div class="card">
+        <h3><a href="https://github.com/chemomer/chemomer-ts">chemomer-ts</a></h3>
+        <p>Node binding (napi). molfile in, identifier / AuxInfo / InChIKey out.</p>
+        <div class="meta"><span class="lang">Node</span>
+          <a href="https://www.npmjs.com/package/chemomer"><img src="https://img.shields.io/npm/v/chemomer.svg" alt="npm"></a></div>
+      </div>
+      <div class="card">
+        <h3><a href="https://github.com/chemomer/chemomer-py">chemomer-py</a></h3>
+        <p>Python binding (pyo3), published to PyPI as <code>chemomer</code>.</p>
+        <div class="meta"><span class="lang">Python</span>
+          <a href="https://pypi.org/project/chemomer/"><img src="https://img.shields.io/pypi/v/chemomer.svg" alt="PyPI"></a></div>
+      </div>
+      <div class="card">
+        <h3><a href="https://github.com/chemomer/chemomer-ruby">chemomer-ruby</a></h3>
+        <p>Ruby bindings over the C ABI, published to RubyGems as <code>chemomer</code>.</p>
+        <div class="meta"><span class="lang">Ruby</span>
+          <a href="https://rubygems.org/gems/chemomer"><img src="https://img.shields.io/gem/v/chemomer.svg" alt="RubyGems"></a></div>
+      </div>
+    </div>
+  </section>
+
+</main>
+
+<footer>
+  <span>© 2026 chemomer contributors — MIT</span>
+  <span><code>~/src/chemomer/</code> · <a href="https://github.com/chemomer">github.com/chemomer</a></span>
+</footer>
+
+</body>
+</html>
